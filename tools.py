@@ -65,7 +65,7 @@ def MA(stock_name, start_date, target_date, N):
 
     return ma_array, ma_name
 
-def KD(stock_name, start_date, target_date, init_KD=50):
+def KD(stock_name, start_date, target_date, init_K=47.44, init_D=36.64):
     # heaader
     kd_name = ['RSV', 'K9', 'D9']
     # adjust start date 
@@ -84,14 +84,15 @@ def KD(stock_name, start_date, target_date, init_KD=50):
     kd_array[:, 1:] = 0
     # RSV
     for i in range(kd_array.shape[0]):
-        highest = history_array[i+1:i+10, 1].max()
-        lowest = history_array[i+1:i+10, 2].min()
-        kd_array[i, 1] = (history_array[i+1, 3] - lowest) / (highest-lowest) * 100
+        highest = history_array[i:i+9, 1].max()
+        lowest = history_array[i:i+9, 2].min()
+        kd_array[i, 1] = (history_array[i, 3] - lowest) / (highest-lowest) * 100
         
     # KD
     for i in range(kd_array.shape[0], -1, -1):
         if i==kd_array.shape[0]:
-            pre_K, pre_D = init_KD, init_KD
+            # assign start_day-1's real K & real D
+            pre_K, pre_D = init_K, init_D
         else:
             pre_rsv = kd_array[i, 1]
             # K
@@ -109,7 +110,7 @@ def KD(stock_name, start_date, target_date, init_KD=50):
 
 
 if __name__ == "__main__":
-    json_result = main(2330, 20220420, 20220429)
+    json_result = main(2330, 20220421, 20220429)
     print(json_result)
 
     # json_result = KD(2330, 20220421, 20220429)
