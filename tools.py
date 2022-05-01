@@ -2,6 +2,7 @@ import requests
 import json
 import numpy as np
 import time
+import pandas as pd
 from datetime import datetime, timedelta
 
 def main(stock_name, start_date, target_date):
@@ -22,7 +23,11 @@ def main(stock_name, start_date, target_date):
     tmp, [rsv, k9, d9] = KD(stock_name, start_date, target_date)
     result = np.hstack((result, tmp[:, 1:]))
 
-    titles = ['date', ma5_title, ma10_title, ma20_title, ma60_title, ma120_title, ma240_title, rsv, k9, d9]
+    # MACD
+    tmp, [macd, dif9, ema12, ema26] = MACD(stock_name, start_date, target_date)
+    result = np.hstack((result, tmp[:, 1:]))
+
+    titles = ['date', ma5_title, ma10_title, ma20_title, ma60_title, ma120_title, ma240_title, rsv, k9, d9, ema12, ema26, dif9, macd]
     json_list = []
     for i in range(result.shape[0]):
         # to timestamp
@@ -107,10 +112,44 @@ def KD(stock_name, start_date, target_date, init_K=47.44, init_D=36.64):
     
     return kd_array, kd_name
  
+def MACD(stock_name, start_date, target_date):
+    # heaader
+    macd_name = ['MACD', 'DIF9', 'EMA12', 'EMA26']
+    # adjust start date 
+    require_start_date = datetime.strptime(str(start_date), "%Y%m%d")
+    require_start_date -= timedelta(days=200)
+    require_start_date = require_start_date.strftime('%Y%m%d')
+    api_url = "http://140.116.86.242:8081/stock/api/v1/api_get_stock_info_from_date_json/{}/{}/{}".format(stock_name, require_start_date, target_date)
+    r = requests.get(api_url)
+    history_info = json.loads(r.text)['data']
+    history_data = [[datetime.fromtimestamp(int(data['date'])).date(), data["close"]] for data in history_info]
+    history_array = np.array(history_data)
+    start_datetime = datetime.strptime(str(start_date), "%Y%m%d").date()
 
+    # caculate MACD
+    history_df = pd.DataFrame(history_data[::-1], columns=['date', 'close'])
+    history_df['EMA12'] = history_df["close"].ewm(span=12, adjust=False, min_periods=12).mean()
+    history_df['EMA26'] = history_df["close"].ewm(span=26, adjust=False, min_periods=26).mean()
+    history_df['DIF9']  = history_df['EMA12'] - history_df['EMA26']
+    history_df['MACD'] = history_df['DIF9'].ewm(span=9, adjust=False).mean()
+    # print(DIF)
+    # history_df['MACD'] = 2*history_df['DIF9']-DIF
+    need_index = np.argwhere(history_array[:, 0]>=start_datetime)
+    # macd_array = history_array[need_index].reshape(-1, 2)
+
+    macd_df = history_df.tail(need_index.shape[0])
+    macd_df = macd_df.drop(columns=['close'])
+    macd_array = macd_df.to_numpy()
+    
+    macd_array[:, 1:] = np.round(macd_array[:, 1:].astype(float), 2)
+    
+    return macd_array[::-1], macd_name
 
 if __name__ == "__main__":
     json_result = main(2330, 20220421, 20220429)
     print(json_result)
 
-    # json_result = KD(2330, 20220421, 20220429)
+    # json_result, _ = KD(2330, 20220421, 20220429)
+    # print(json_result)
+    # macd_array, _ = MACD(2330, 20220421, 20220429)
+    # print(macd_array)
