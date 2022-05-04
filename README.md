@@ -22,3 +22,6 @@ python3 tools.py -stock "STOCK NAME" -start "START_DATE" -end "END_DATE"
 ```cmd
 python3 tools.py -stock 2330 -start 20220421 -end 20220429
 ```
+
+- output:
+![](img/cmd.png)
