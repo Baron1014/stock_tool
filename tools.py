@@ -59,9 +59,7 @@ def main(stock_name, start_date, target_date):
         result[i, 0] = time.mktime(result[i, 0].timetuple())
         json_list.append(dict(zip(titles, result[i])))
     
-    # result = np.round(result[:, 1: ], 2)
-    
-    return json.dumps({"data": json_list, 'title': titles})
+    return json.dumps({"data": json_list, 'title': titles}, indent=4)
 
 def MA(stock_name, start_date, target_date, N):
     # heaader
@@ -303,14 +301,72 @@ def CDP(stock_name, start_date, target_date):
 
     return result[::-1], cdp_name
 
+def DMI(stock_name, start_date, target_date, di_period=7, adx_period=6):
+    # adjust start date 
+    require_start_date = datetime.strptime(str(start_date), "%Y%m%d")
+    require_start_date -= timedelta(days=30)
+    require_start_date = require_start_date.strftime('%Y%m%d')
+    api_url = "http://140.116.86.242:8081/stock/api/v1/api_get_stock_info_from_date_json/{}/{}/{}".format(stock_name, require_start_date, target_date)
+    r = requests.get(api_url)
+    history_info = json.loads(r.text)['data']
+    history_data = [[datetime.fromtimestamp(int(data['date'])).date(), data["high"], data["low"], data["close"]] for data in history_info]
+    history_array = np.array(history_data[::-1])
+    start_datetime = datetime.strptime(str(start_date), "%Y%m%d").date()
+    need_index = np.argwhere(history_array[:, 0]>=start_datetime)
+
+    # history_df = pd.DataFrame(history_data[::-1], columns=['date', 'high', 'low', 'close'])
+    close = np.double(history_array[:, 3])
+    high = np.double(history_array[:, 1])
+    low = np.double(history_array[:, 2])
+
+    pdi = talib.PLUS_DI(high, low, close, di_period) 
+    mdi = talib.MINUS_DI(high, low, close, di_period)
+    adx = talib.ADX(high, low, close, timeperiod=adx_period)
+    adxr = talib.ADXR(high, low, close, timeperiod=adx_period)
+
+    result = np.hstack((history_array[:, :1], pdi.reshape(-1, 1)))
+    result = np.hstack((result, mdi.reshape(-1, 1)))
+    result = np.hstack((result, adx.reshape(-1, 1)))
+    result = np.hstack((result, adxr.reshape(-1, 1)))
+
+    result[:, 1:] = np.round(-1*(result[:, 1:].astype(float)), 2)
+    result = result[need_index]
+    result = result.reshape(need_index.shape[0], 5)
+
+    return result[::-1]
+
 
 if __name__ == "__main__":
-    json_result = main(2330, 20220421, 20220429)
+    import argparse
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-stock',
+                        '--stock_name',
+                        type=int,
+                        nargs='?',
+                        help='Input stock name')
+
+    parser.add_argument('-start',
+                        '--start_date',
+                        type=int,
+                        nargs='?',
+                        help='Input start date')
+
+    parser.add_argument('-end',
+                        '--end_date',
+                        type=int,
+                        nargs='?',
+                        help='Input end date')
+
+    args = parser.parse_args()
+    json_result = main(args.stock_name, args.start_date, args.end_date)
+
+    # json_result = main(2330, 20220421, 20220429)
     print(json_result)
 
     # json_result, _ = KD(2330, 20220421, 20220429)
     # print(json_result)
     # macd_array, _ = MACD(2330, 20220421, 20220429)
     # print(macd_array)
-    # json_result = CDP(2330, 20220421, 20220429)
+    # json_result = DMI(2330, 20220421, 20220429)
     # print(json_result)
